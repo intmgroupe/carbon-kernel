@@ -21,6 +21,7 @@
     ${carbon.home} represents the carbon.home system property.
     Other system properties can be specified in a similar manner.
 -->
+<!-- Modified by INTM for EDF/Enedis -->
 <Server xmlns="http://wso2.org/projects/carbon/carbon.xml" xmlns:svns="http://org.wso2.securevault/configuration">
 
     <!--
@@ -50,7 +51,9 @@
     <!--
     Host name to be used for the Carbon management console
     -->
-     {%if server.hostname is defined %}
+     {%if server.mgt_console_hostname is defined %}
+    <MgtHostName>{{server.mgt_console_hostname}}</MgtHostName>
+     {%elif server.hostname is defined %}
     <MgtHostName>{{server.hostname}}</MgtHostName>
      {% endif %}
 
@@ -106,6 +109,10 @@
     <ProxyContextPath>{{server.proxy_context_path}}</ProxyContextPath>
     {% endif %}
 
+    {% if server.diagnostic_log_mode is defined %}
+    <DiagnosticLogMode>{{server.diagnostic_log_mode}}</DiagnosticLogMode>
+    {% endif %}
+
     <!-- In-order to  get the registry http Port from the back-end when the default http transport is not the same-->
     <!--RegistryHttpPort>9763</RegistryHttpPort-->
 
@@ -113,7 +120,10 @@
     Number of items to be displayed on a management console page. This is used at the
     backend server for pagination of various items.
     -->
-    <ItemsPerPage>15</ItemsPerPage>
+    <!--This is used as the default items per page-->
+    <ItemsPerPage>{{server.default_items_per_page}}</ItemsPerPage>
+
+    <MaximumItemsPerPage>{{server.max_items_per_page}}</MaximumItemsPerPage>
 
     <!-- The endpoint URL of the cloud instance management Web service -->
     <!--<InstanceMgtWSEndpoint>https://ec2.amazonaws.com/</InstanceMgtWSEndpoint>-->
@@ -266,6 +276,34 @@
             </EagerLoading>
             {% endif %}
         </LoadingPolicy>
+
+        <!-- Flag to enable or disable tenant deletion -->
+        {% if tenant_mgt.tenant_deletion is defined %}
+        <TenantDelete>{{tenant_mgt.tenant_deletion}}</TenantDelete>
+        {% else %}
+        <TenantDelete>false</TenantDelete>
+        {% endif %}
+
+        <!-- Flag to enable or disable primary users deletion -->
+        {% if tenant_mgt.deletion.primary_users is defined %}
+        <DeletePrimaryUsersOnTenantDeletion>{{tenant_mgt.deletion.primary_users}}</DeletePrimaryUsersOnTenantDeletion>
+        {% else %}
+        <DeletePrimaryUsersOnTenantDeletion>false</DeletePrimaryUsersOnTenantDeletion>
+        {% endif %}
+
+        <!-- Configurations related to listener invocation by tenant admin service -->
+        <ListenerInvocationPolicy>
+            <!-- Flag to enable or disable listener invocation on tenant delete -->
+            {% if tenant_mgt.invoke_on_delete is defined %}
+            <InvokeOnDelete>{{tenant_mgt.invoke_on_delete}}</InvokeOnDelete>
+            {% else %}
+            <InvokeOnDelete>false</InvokeOnDelete>
+            {% endif %}
+        </ListenerInvocationPolicy>
+        {% if tenant_mgt.enable_tenant_theme_mgt is defined %}
+        <!--   Flag to enable or disable tenant theming for the management console    -->
+        <EnableTenantThemeManagement>{{tenant_mgt.enable_tenant_theme_mgt}}</EnableTenantThemeManagement>
+        {% endif %}
     </Tenant>
 
     <!--
@@ -274,9 +312,15 @@
     <Cache>
         <!-- Default cache timeout in minutes -->
         <DefaultCacheTimeout>{{server.default_cache_timeout}}</DefaultCacheTimeout>
+        <DefaultRealmCacheTimeout>{{server.default_realm_cache_timeout}}</DefaultRealmCacheTimeout>
         <!-- Force all caches to act as local -->
         <ForceLocalCache>{{server.force_local_cache}}</ForceLocalCache>
         <DiscardEmptyCaches>{{server.discard_empty_caches}}</DiscardEmptyCaches>
+        {% if server.cache.invalidation_impl is defined %}
+        <CacheInvalidationImpl>{{server.cache.invalidation_impl}}</CacheInvalidationImpl>
+        {% else %}
+         <CacheInvalidationImpl>org.wso2.carbon.caching.impl.clustering.ClusterCacheInvalidationRequestSender</CacheInvalidationImpl>
+        {% endif %}
     </Cache>
 
     <!--
@@ -427,6 +471,9 @@
     <EnableEmailUserName>{{tenant_mgt.enable_email_domain | default('false')}}</EnableEmailUserName>
     {% if password_trim.enable is defined %}
       <EnablePasswordTrim>{{password_trim.enable}}</EnablePasswordTrim>
+    {% endif %}
+    {% if tenant_mgt.disable_email_domain_validation is defined %}
+      <DisableEmailUserNameValidation>{{tenant_mgt.disable_email_domain_validation}}</DisableEmailUserNameValidation>
     {% endif %}
 
     <!--
@@ -587,39 +634,11 @@
            The total file upload size limit in MB
         -->
         <TotalFileSizeLimit>{{server.file_upload.file_size_limit}}</TotalFileSizeLimit>
-
-        <Mapping>
-            <Actions>
-                <Action>keystore</Action>
-                <Action>certificate</Action>
-                <Action>*</Action>
-            </Actions>
-            <Class>org.wso2.carbon.ui.transports.fileupload.AnyFileUploadExecutor</Class>
-        </Mapping>
-
-        <Mapping>
-            <Actions>
-                <Action>jarZip</Action>
-            </Actions>
-            <Class>org.wso2.carbon.ui.transports.fileupload.JarZipUploadExecutor</Class>
-        </Mapping>
         <Mapping>
             <Actions>
                 <Action>dbs</Action>
             </Actions>
             <Class>org.wso2.carbon.ui.transports.fileupload.DBSFileUploadExecutor</Class>
-        </Mapping>
-        <Mapping>
-            <Actions>
-                <Action>tools</Action>
-            </Actions>
-            <Class>org.wso2.carbon.ui.transports.fileupload.ToolsFileUploadExecutor</Class>
-        </Mapping>
-        <Mapping>
-            <Actions>
-                <Action>toolsAny</Action>
-            </Actions>
-            <Class>org.wso2.carbon.ui.transports.fileupload.ToolsAnyFileUploadExecutor</Class>
         </Mapping>
     </FileUploadConfig>
 
@@ -777,4 +796,13 @@
       {% if sts.time_to_live is defined %}
       <STSTimeToLive>{{sts.time_to_live}}</STSTimeToLive>
       {% endif %}
+
+
+    <!-- Configure disable/enable shutdown and restart from the Management Console UI -->
+
+     <disableShutdownRestartFromUI>
+        <disableShutdown>{{server.disable_shutdown_from_ui | default('false')}}</disableShutdown>
+        <disableRestart>{{server.disable_restart_from_ui | default('false')}}</disableRestart>
+     </disableShutdownRestartFromUI>
+
 </Server>
