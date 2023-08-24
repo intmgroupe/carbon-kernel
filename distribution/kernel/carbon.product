@@ -1,7 +1,7 @@
 <?pde version="3.5"?>
 
-<product name="Carbon Product" uid="carbon.product.id" id="carbon.product" application="carbon.application"
 <!-- Modified by INTM for EDF/Enedis -->
+<product name="Carbon Product" uid="carbon.product.id" id="carbon.product" application="carbon.application"
 version="4.6.1" useFeatures="true" includeLaunchers="true">
 
    <configIni use="default">
